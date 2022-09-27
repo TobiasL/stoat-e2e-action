@@ -1,13 +1,10 @@
-name: 'Wait'
-description: 'Wait a designated number of milliseconds'
+name: 'E2E tool'
+description: 'Run E2E tests in E2E tool'
 inputs:
-  milliseconds:  # id of input
-    description: 'number of milliseconds to wait'
+  api-key:
+    description: 'The API key for E2E tool'
     required: true
-    default: '1000'
-outputs:
-  time: # output will be available to future steps
-    description: 'The current time after waiting'
+
 runs:
   using: 'node16'
   main: 'dist/index.js'
