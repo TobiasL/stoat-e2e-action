@@ -4106,9 +4106,7 @@ const http = __nccwpck_require__(255)
 const exec = __nccwpck_require__(514)
 const { open, readFile } = __nccwpck_require__(292)
 
-// TODO: Pack together the code? Test open the e2e.toml file.
 // TODO: Make sure that we send the Action version so that old ones can be rejected.
-// TODO: Throw error if not on Linux.
 const CONFIG_FILENAME = 'e2e.toml'
 
 const getConfigString = async () => {
@@ -4117,40 +4115,46 @@ const getConfigString = async () => {
 
     return configBuffer.toString()
   } catch (error) {
-    throw new Error(`E2E config file named "${CONFIG_FILENAME}" not found in current working directory.`)
+    core.setFailed(`E2E config file named "${CONFIG_FILENAME}" not found in current working directory.`)
+
+    process.exit(1)
   }
 }
 
-// most @actions toolkit packages have async methods
-async function run() {
+const run = async () => {
   try {
+    const apiKey = core.getInput('api-key', { required: true })
+
     await getConfigString()
+
     await exec.exec('zip -r e2e.zip . -x ".git/*" ".github/*"')
 
-    await exec.exec('ls -lah')
+    const client = new http.HttpClient('e2e-tool-action')
 
-    const client = new http.HttpClient('temp')
+    const { result } = await client.postJSON('http://host.docker.internal:4444/runs', {
+      apiKey,
+      actionVersion: '0.0.1',
+    })
 
-    const res = await client.postJson('http://host.docker.internal:4444/hej', { temp: 1 })
-
-    console.log('res', res)
+    console.log('result', result)
 
     const filehandle = await open('e2e.zip')
 
-    const runId = '123-123'
+    const url = `http://host.docker.internal:4444/stream/${result.runId}`
 
-    const url = `http://host.docker.internal:4444/stream/${runId}`
-    const res2 = await client.sendStream('POST', url,
-      filehandle.createReadStream())
+    await client.sendStream('POST', url, filehandle.createReadStream())
 
-    console.log('res2', res2)
+    core.info('E2E run has been started.')
+
+    // TODO: Set up the polling of the run status with the runId.
   } catch (error) {
     console.log(error)
-    core.setFailed(error.message);
+
+    core.setFailed(error.message)
   }
 }
 
-run();
+run()
 
 })();
 

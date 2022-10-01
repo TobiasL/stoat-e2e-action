@@ -18,7 +18,7 @@ const getConfigString = async () => {
   }
 }
 
-async function run() {
+const run = async () => {
   try {
     const apiKey = core.getInput('api-key', { required: true })
 
@@ -28,7 +28,10 @@ async function run() {
 
     const client = new http.HttpClient('e2e-tool-action')
 
-    const { result } = await client.post('http://host.docker.internal:4444/runs', apiKey)
+    const { result } = await client.postJSON('http://host.docker.internal:4444/runs', {
+      apiKey,
+      actionVersion: '0.0.1',
+    })
 
     console.log('result', result)
 
