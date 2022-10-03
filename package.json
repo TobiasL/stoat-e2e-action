@@ -1,6 +1,6 @@
 {
   "name": "e2e-tool-action",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "GitHub Action for smoothly building and running your E2E tests.",
   "main": "index.js",
   "scripts": {
@@ -27,7 +27,8 @@
   "dependencies": {
     "@actions/core": "1.9.1",
     "@actions/exec": "1.1.1",
-    "@actions/http-client": "2.0.1"
+    "@actions/http-client": "2.0.1",
+    "already": "2.2.1"
   },
   "devDependencies": {
     "@vercel/ncc": "0.34.0",

@@ -1,33 +1,27 @@
 const core = require('@actions/core')
-const http = require('@actions/http-client')
-const exec = require('@actions/exec')
-const { open } = require('fs/promises')
 
 const getConfigString = require('./getConfigString')
+const isValidRunnerOS = require('./isValidRunnerOS')
+const zipRepoForE2E = require('./zipRepoForE2E')
+const { createRun, uploadRunZip, pollRunStatus } = require('./requestClient')
 
 const runE2E = async () => {
-  const apiKey = core.getInput('api-key', { required: true })
+  const apiKey = core.getInput('api_key', { required: true })
+
+  if (!isValidRunnerOS()) {
+    throw new Error('GitHub Action can only run on Linux or macOS')
+  }
 
   await getConfigString()
 
-  await exec.exec('zip -r e2e.zip . -x ".git/*" ".github/*"')
+  const runId = await createRun(apiKey)
 
-  const client = new http.HttpClient('e2e-tool-action')
-
-  const { result } = await client.postJSON('http://host.docker.internal:4444/runs', {
-    apiKey,
-    actionVersion: '0.0.1',
-  })
-
-  const filehandle = await open('e2e.zip')
-
-  const url = `http://host.docker.internal:4444/stream/${result.runId}`
-
-  await client.sendStream('POST', url, filehandle.createReadStream())
+  const filehandle = await zipRepoForE2E()
+  await uploadRunZip(apiKey, runId, filehandle)
 
   core.info('E2E run has been started.')
 
-  // TODO: Set up the polling of the run status with the runId.
+  return pollRunStatus(apiKey, runId)
 }
 
 module.exports = runE2E

@@ -1,7 +1,7 @@
 name: 'E2E tool'
 description: 'Run E2E tests in E2E tool'
 inputs:
-  api-key:
+  api_key:
     description: 'The API key for E2E tool'
     required: true
 
