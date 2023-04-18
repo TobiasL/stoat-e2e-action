@@ -4579,6 +4579,66 @@ exports["default"] = _default;
 
 /***/ }),
 
+/***/ 9450:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const http = __nccwpck_require__(6255)
+
+const npmPackage = __nccwpck_require__(4147)
+
+const client = new http.HttpClient('stoat-e2e-action')
+
+const baseUrl = process.env.BASE_URL || 'http://host.docker.internal:4444'
+
+const defaultHeaders = {
+  'x-action-version': npmPackage.version,
+}
+
+const handleResponse = async (request) => {
+  try {
+    const { result } = await request
+
+    return result
+  } catch (error) {
+    if (error.statusCode === 401) {
+      throw new Error('Unauthorized. Check that the variable API_KEY is correct.')
+    } else if (error.statusCode === 403) {
+      throw new Error('Forbidden. Check that the environment variable BASE_URL is correct and reachable.')
+    }
+
+    throw new Error(`Unknown error: ${error}`)
+  }
+}
+const createRun = async (apiKey) => {
+  const headers = { ...defaultHeaders, 'x-api-key': apiKey }
+  const request = client.postJson(`${baseUrl}/runs`, {}, headers)
+
+  return handleResponse(request)
+}
+
+const uploadRunZip = async (apiKey, runId, zipStream) => {
+  const headers = { ...defaultHeaders, 'x-api-key': apiKey }
+  const request = client.sendStream('POST', `${baseUrl}/runs/${runId}/zip`, zipStream, headers)
+
+  return handleResponse(request)
+}
+
+const getRunStatus = async (runId, apiKey) => {
+  const headers = { ...defaultHeaders, 'x-api-key': apiKey }
+  const request = client.getJson(`${baseUrl}/runs/${runId}`, headers)
+
+  return handleResponse(request)
+}
+
+module.exports = {
+  createRun,
+  uploadRunZip,
+  getRunStatus,
+}
+
+
+/***/ }),
+
 /***/ 8462:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
@@ -4614,79 +4674,33 @@ module.exports = isValidRunnerOS
 
 /***/ }),
 
-/***/ 9270:
+/***/ 7584:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
-const http = __nccwpck_require__(6255)
 const core = __nccwpck_require__(2186)
 const { retry, delay } = __nccwpck_require__(2176)
 
-const npmPackage = __nccwpck_require__(4147)
-
-const client = new http.HttpClient('e2e-tool-action')
-
-const defaultHeaders = {
-  'x-action-version': npmPackage.version,
-}
-
-const createRun = async (apiKey) => {
-  const url = process.env.BASE_URL || 'http://host.docker.internal:4444'
-
-  const headers = { ...defaultHeaders, 'x-api-key': apiKey }
-
-  const { result } = await client.postJson(`${url}/runs`, {}, headers)
-
-  core.info(`See the E2E run on Stoat Cloud: ${result.url}`)
-
-  if (result.newReleaseUrl) {
-    core.warning(`Please upgrade to the newest version of this GitHub Action: ${result.newReleaseUrl}`)
-  }
-
-  return result?.runId
-}
-
-const uploadRunZip = async (apiKey, runId, runZip) => {
-  const url = process.env.BASE_URL || 'http://host.docker.internal:4444'
-  const zipStream = runZip.createReadStream()
-
-  const headers = { ...defaultHeaders, 'x-api-key': apiKey }
-
-  await client.sendStream('POST', `${url}/runs/${runId}/zip`, zipStream, headers)
-}
+const { getRunStatus } = __nccwpck_require__(9450)
 
 const pollRunStatus = async (apiKey, runId) => {
-  const url = process.env.BASE_URL || 'http://host.docker.internal:4444'
+  const testRunStatus = async () => {
+    const { status, duration } = await getRunStatus(runId, apiKey)
 
-  const headers = { ...defaultHeaders, 'x-api-key': apiKey }
-
-  const getRunStatus = async () => {
-    const { result, statusCode } = await client.getJson(`${url}/runs/${runId}`, headers)
-
-    if (statusCode !== 200) {
-      throw new Error(`Got status code ${statusCode} when polling for run status.`)
-    }
-
-    if (result.status === 'created') {
+    if (status === 'created') {
       await delay(2000)
 
       throw new Error('Retry')
     }
 
-    return result
+    return duration
   }
 
-  const result = await retry(100, getRunStatus, (error) => error.message === 'Retry')
+  const duration = await retry(100, testRunStatus, (error) => error.message === 'Retry')
 
-  core.info(`Duration of the E2E run on Stoat Cloud: ${result.duration}`)
-
-  return result
+  core.notice(`Duration of the E2E run on Stoat Cloud: ${duration}`)
 }
 
-module.exports = {
-  createRun,
-  uploadRunZip,
-  pollRunStatus,
-}
+module.exports = pollRunStatus
 
 
 /***/ }),
@@ -4699,7 +4713,8 @@ const core = __nccwpck_require__(2186)
 const getConfigString = __nccwpck_require__(8462)
 const isValidRunnerOS = __nccwpck_require__(1404)
 const zipRepoForE2E = __nccwpck_require__(4403)
-const { createRun, uploadRunZip, pollRunStatus } = __nccwpck_require__(9270)
+const pollRunStatus = __nccwpck_require__(7584)
+const { createRun, uploadRunZip } = __nccwpck_require__(9450)
 
 const runE2E = async () => {
   const apiKey = core.getInput('api_key', { required: true })
@@ -4710,10 +4725,18 @@ const runE2E = async () => {
 
   await getConfigString()
 
-  const runId = await createRun(apiKey)
+  const { url, runId, newReleaseUrl } = await createRun(apiKey)
+
+  core.info(`See the E2E run on Stoat Cloud: ${url}`)
+
+  if (newReleaseUrl) {
+    core.warning(`Please upgrade to the newest version of this GitHub Action: ${newReleaseUrl}`)
+  }
 
   const filehandle = await zipRepoForE2E()
-  await uploadRunZip(apiKey, runId, filehandle)
+  const zipStream = filehandle.createReadStream()
+
+  await uploadRunZip(apiKey, runId, zipStream)
 
   core.info('E2E run has been started.')
 
@@ -4919,9 +4942,9 @@ const index = async () => {
   try {
     await runE2E()
 
-    core.info('E2E run has finished successfully.')
+    core.notice('Stoat E2E run has finished successfully.')
   } catch (error) {
-    core.setFailed(error.message)
+    core.setFailed(`Stoat E2E run failed with error: ${error.message}`)
   }
 }
 

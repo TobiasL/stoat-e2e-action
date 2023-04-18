@@ -3,7 +3,8 @@ const core = require('@actions/core')
 const getConfigString = require('./getConfigString')
 const isValidRunnerOS = require('./isValidRunnerOS')
 const zipRepoForE2E = require('./zipRepoForE2E')
-const { createRun, uploadRunZip, pollRunStatus } = require('./requestClient')
+const pollRunStatus = require('./pollRunStatus')
+const { createRun, uploadRunZip } = require('./client/stoatCloudClient')
 
 const runE2E = async () => {
   const apiKey = core.getInput('api_key', { required: true })
@@ -14,10 +15,18 @@ const runE2E = async () => {
 
   await getConfigString()
 
-  const runId = await createRun(apiKey)
+  const { url, runId, newReleaseUrl } = await createRun(apiKey)
+
+  core.info(`See the E2E run on Stoat Cloud: ${url}`)
+
+  if (newReleaseUrl) {
+    core.warning(`Please upgrade to the newest version of this GitHub Action: ${newReleaseUrl}`)
+  }
 
   const filehandle = await zipRepoForE2E()
-  await uploadRunZip(apiKey, runId, filehandle)
+  const zipStream = filehandle.createReadStream()
+
+  await uploadRunZip(apiKey, runId, zipStream)
 
   core.info('E2E run has been started.')
 

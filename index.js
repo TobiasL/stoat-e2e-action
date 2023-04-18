@@ -6,9 +6,9 @@ const index = async () => {
   try {
     await runE2E()
 
-    core.info('E2E run has finished successfully.')
+    core.notice('Stoat E2E run has finished successfully.')
   } catch (error) {
-    core.setFailed(error.message)
+    core.setFailed(`Stoat E2E run failed with error: ${error.message}`)
   }
 }
 
