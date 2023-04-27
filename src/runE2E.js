@@ -1,7 +1,6 @@
 const core = require('@actions/core')
 
 const getConfigString = require('./getConfigString')
-const isValidRunnerOS = require('./isValidRunnerOS')
 const zipRepoForE2E = require('./zipRepoForE2E')
 const pollRunStatus = require('./pollRunStatus')
 const { createRun, uploadRunZip } = require('./client/stoatCloudClient')
@@ -9,7 +8,7 @@ const { createRun, uploadRunZip } = require('./client/stoatCloudClient')
 const runE2E = async () => {
   const apiKey = core.getInput('api_key', { required: true })
 
-  if (!isValidRunnerOS()) {
+  if (process.env.RUNNER_OS === 'Windows') {
     throw new Error('GitHub Action can only run on Linux or macOS')
   }
 
