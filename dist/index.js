@@ -4691,15 +4691,23 @@ module.exports = getConfigString
 
 /***/ }),
 
-/***/ 1404:
-/***/ ((module) => {
+/***/ 2464:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
-const VALID_RUNNER_OS = ['Linux', 'macOS']
+const core = __nccwpck_require__(2186)
 
-const isValidRunnerOS = () => process.env.RUNNER_OS
-  && VALID_RUNNER_OS.includes(process.env.RUNNER_OS)
+const getTimeout = () => {
+  const rawTimeout = core.getInput('timeout') || '10'
+  const timeout = parseInt(rawTimeout, 10)
 
-module.exports = isValidRunnerOS
+  if (Number.isNaN(timeout)) {
+    throw new Error('Error converting input value "timeout" into an integer')
+  }
+
+  return timeout
+}
+
+module.exports = getTimeout
 
 
 /***/ }),
@@ -4712,9 +4720,19 @@ const { retry, delay } = __nccwpck_require__(2176)
 
 const { getRunStatus } = __nccwpck_require__(9450)
 
-const pollRunStatus = async (apiKey, runId) => {
+let hasTimedOut = false
+
+const pollRunStatus = async (apiKey, runId, timeout) => {
+  setTimeout(() => {
+    hasTimedOut = true
+  }, timeout * 60 * 1000)
+
   const testRunStatus = async () => {
     const { status, duration } = await getRunStatus(runId, apiKey)
+
+    if (hasTimedOut) {
+      throw new Error(`E2E run has timed out after ${timeout} minutes. Raise the timeout if needed`)
+    }
 
     if (status === 'created') {
       await delay(2000)
@@ -4725,7 +4743,7 @@ const pollRunStatus = async (apiKey, runId) => {
     return duration
   }
 
-  const duration = await retry(100, testRunStatus, (error) => error.message === 'Retry')
+  const duration = await retry(Infinity, testRunStatus, (error) => error.message === 'Retry')
 
   core.notice(`Duration of the E2E run on Stoat Cloud: ${duration}`)
 }
@@ -4740,8 +4758,8 @@ module.exports = pollRunStatus
 
 const core = __nccwpck_require__(2186)
 
+const getTimeout = __nccwpck_require__(2464)
 const getConfigString = __nccwpck_require__(8462)
-const isValidRunnerOS = __nccwpck_require__(1404)
 const zipRepoForE2E = __nccwpck_require__(4403)
 const pollRunStatus = __nccwpck_require__(7584)
 const { createRun, uploadRunZip } = __nccwpck_require__(9450)
@@ -4749,9 +4767,11 @@ const { createRun, uploadRunZip } = __nccwpck_require__(9450)
 const runE2E = async () => {
   const apiKey = core.getInput('api_key', { required: true })
 
-  if (!isValidRunnerOS()) {
+  if (process.env.RUNNER_OS === 'Windows') {
     throw new Error('GitHub Action can only run on Linux or macOS')
   }
+
+  const timeout = getTimeout()
 
   await getConfigString()
 
@@ -4770,7 +4790,7 @@ const runE2E = async () => {
 
   core.info('E2E run has been started.')
 
-  return pollRunStatus(apiKey, runId)
+  return pollRunStatus(apiKey, runId, timeout)
 }
 
 module.exports = runE2E
@@ -4973,8 +4993,12 @@ const index = async () => {
     await runE2E()
 
     core.notice('Stoat E2E run has finished successfully.')
+
+    process.exit(0)
   } catch (error) {
     core.setFailed(`Stoat E2E run failed with error: ${error.message}`)
+
+    process.exit(1)
   }
 }
 

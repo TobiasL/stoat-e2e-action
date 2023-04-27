@@ -1,9 +1,12 @@
-name: 'E2E tool'
-description: 'Run E2E tests in E2E tool'
+name: 'Stoat E2E Action'
+description: 'The Stoat E2E Action is a GitHub Action that helps you easily build and run your end-to-end (E2E) tests with Stoat Cloud'
 inputs:
   api_key:
-    description: 'The API key for E2E tool'
+    description: 'The API key for Stoat Cloud'
     required: true
+  timeout:
+    description: 'Timeout in minutes before an E2E run times out'
+    required: false
 
 runs:
   using: 'node16'

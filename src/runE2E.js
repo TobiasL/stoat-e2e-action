@@ -1,5 +1,6 @@
 const core = require('@actions/core')
 
+const getTimeout = require('./getTimeout')
 const getConfigString = require('./getConfigString')
 const zipRepoForE2E = require('./zipRepoForE2E')
 const pollRunStatus = require('./pollRunStatus')
@@ -11,6 +12,8 @@ const runE2E = async () => {
   if (process.env.RUNNER_OS === 'Windows') {
     throw new Error('GitHub Action can only run on Linux or macOS')
   }
+
+  const timeout = getTimeout()
 
   await getConfigString()
 
@@ -29,7 +32,7 @@ const runE2E = async () => {
 
   core.info('E2E run has been started.')
 
-  return pollRunStatus(apiKey, runId)
+  return pollRunStatus(apiKey, runId, timeout)
 }
 
 module.exports = runE2E

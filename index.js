@@ -7,8 +7,12 @@ const index = async () => {
     await runE2E()
 
     core.notice('Stoat E2E run has finished successfully.')
+
+    process.exit(0)
   } catch (error) {
     core.setFailed(`Stoat E2E run failed with error: ${error.message}`)
+
+    process.exit(1)
   }
 }
 
