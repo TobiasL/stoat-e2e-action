@@ -12,7 +12,15 @@ const defaultHeaders = {
 
 const handleResponse = async (request) => {
   try {
-    const { result } = await request
+    const { result, statusCode, message } = await request
+
+    if (message?.statusCode === 500) {
+      throw new Error('Internal server error when uploading the run.')
+    }
+
+    if (statusCode === 404) {
+      throw new Error('Status 404, wrong BASE_URL provided.')
+    }
 
     return result
   } catch (error) {
