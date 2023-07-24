@@ -11,10 +11,14 @@ const pollRunStatus = async (apiKey, runId, timeout) => {
   }, timeout * 60 * 1000)
 
   const testRunStatus = async () => {
-    const { status, duration } = await getRunStatus(runId, apiKey)
+    const { status, duration, error } = await getRunStatus(runId, apiKey)
 
     if (hasTimedOut) {
       throw new Error(`E2E run has timed out after ${timeout} minutes. Raise the timeout if needed`)
+    }
+
+    if (status === 'error') {
+      throw new Error(error)
     }
 
     if (status === 'created') {
